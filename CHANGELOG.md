@@ -16,7 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Breaking changes
 
 - Automatically route `HEAD` requests to `GET` handlers if the path matches. Can
-  be overridden by declaring a handler for `HEAD` requests for the same path.
+  be overridden by declaring a handler for `HEAD` requests for the same path. ([#129](https://github.com/tokio-rs/axum/pull/129))
+- `axum::handler::OnMethod` and `axum::service::OnMethod` no longer implement
+  `Copy` and their response futures are now
+  `axum::service::future::OnMethodResponseFuture` ([#129](https://github.com/tokio-rs/axum/pull/129))
 
 # 0.1.2 (01. August, 2021)
 
