@@ -4,11 +4,7 @@ use crate::{
 };
 use bytes::Bytes;
 use futures_util::future::Ready;
-use http::{
-    header::AUTHORIZATION,
-    header::{self, HeaderMap},
-    Request, Response, StatusCode, Uri,
-};
+use http::{header::HeaderMap, header::AUTHORIZATION, Request, Response, StatusCode, Uri};
 use hyper::{Body, Server};
 use serde::Deserialize;
 use serde_json::json;

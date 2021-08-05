@@ -93,13 +93,17 @@ use crate::{
 };
 use bytes::Bytes;
 use futures_util::ready;
-use http::{Request, Response};
+use http::{Method, Request, Response};
 use pin_project_lite::pin_project;
 use std::{
     convert::Infallible,
     fmt,
     future::Future,
     marker::PhantomData,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     task::{Context, Poll},
 };
 use tower::{util::Oneshot, BoxError, Service, ServiceExt as _};
@@ -250,6 +254,8 @@ pub fn on<S, B>(
 where
     S: Service<Request<B>> + Clone,
 {
+    let head_handler_defined = Arc::new(AtomicBool::new(method.is_head()));
+
     OnMethod {
         method,
         svc: BoxResponseBody {
@@ -257,6 +263,7 @@ where
             _request_body: PhantomData,
         },
         fallback: EmptyRouter::method_not_allowed(),
+        head_handler_defined,
     }
 }
 
@@ -264,9 +271,10 @@ where
 /// chaining additional services.
 #[derive(Clone, Debug)]
 pub struct OnMethod<S, F> {
-    pub(crate) method: MethodFilter,
-    pub(crate) svc: S,
-    pub(crate) fallback: F,
+    method: MethodFilter,
+    svc: S,
+    fallback: F,
+    head_handler_defined: Arc<AtomicBool>,
 }
 
 impl<S, F> OnMethod<S, F> {
@@ -422,12 +430,17 @@ impl<S, F> OnMethod<S, F> {
     where
         T: Service<Request<B>> + Clone,
     {
+        if method.is_head() {
+            self.head_handler_defined.store(true, Ordering::Relaxed);
+        }
+
         OnMethod {
             method,
             svc: BoxResponseBody {
                 inner: svc,
                 _request_body: PhantomData,
             },
+            head_handler_defined: self.head_handler_defined.clone(),
             fallback: self,
         }
     }
@@ -442,20 +455,20 @@ where
 {
     type Response = Response<BoxBody>;
     type Error = S::Error;
-    type Future = RouteFuture<S, F, B>;
+    type Future = future::OnMethodResponseFuture<S, F, B>;
 
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, req: Request<B>) -> Self::Future {
-        if self.method.matches(req.method()) {
-            let fut = self.svc.clone().oneshot(req);
-            RouteFuture::a(fut)
-        } else {
-            let fut = self.fallback.clone().oneshot(req);
-            RouteFuture::b(fut)
-        }
+        route_request_and_handle_head_overrides(
+            req,
+            &self.svc,
+            &self.fallback,
+            &self.head_handler_defined,
+            self.method,
+        )
     }
 }
 
@@ -670,4 +683,39 @@ where
         let res = res.map(box_body);
         Poll::Ready(Ok(res))
     }
+}
+
+pub(crate) fn route_request_and_handle_head_overrides<S, F, B>(
+    req: Request<B>,
+    svc: &S,
+    fallback: &F,
+    head_handler_defined: &Arc<AtomicBool>,
+    method: MethodFilter,
+) -> future::OnMethodResponseFuture<S, F, B>
+where
+    S: Service<Request<B>, Response = Response<BoxBody>> + Clone,
+    F: Service<Request<B>, Response = Response<BoxBody>, Error = S::Error> + Clone,
+{
+    let req_method = req.method().clone();
+
+    let head_handler_defined = head_handler_defined.load(Ordering::Relaxed);
+
+    let f = if
+    // there is an explicit HEAD handler defined, and that is us
+    (head_handler_defined && req_method == Method::HEAD && method.is_head())
+            // there is no head handler defined and we can handle this request
+            || (!head_handler_defined
+                && method.matches(&Method::GET)
+                && (req_method == Method::GET || req_method == Method::HEAD))
+            // fallback to general method match
+            || method.matches(req.method())
+    {
+        let fut = svc.clone().oneshot(req);
+        RouteFuture::a(fut)
+    } else {
+        let fut = fallback.clone().oneshot(req);
+        RouteFuture::b(fut)
+    };
+
+    future::OnMethodResponseFuture { f, req_method }
 }

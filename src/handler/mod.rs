@@ -4,12 +4,12 @@ use crate::{
     body::{box_body, BoxBody},
     extract::FromRequest,
     response::IntoResponse,
-    routing::{EmptyRouter, MethodFilter, RouteFuture},
+    routing::{EmptyRouter, MethodFilter},
     service::HandleError,
 };
 use async_trait::async_trait;
 use bytes::Bytes;
-use http::{Method, Request, Response};
+use http::{Request, Response};
 use std::{
     convert::Infallible,
     fmt,
@@ -639,34 +639,19 @@ where
 {
     type Response = Response<BoxBody>;
     type Error = Infallible;
-    type Future = future::OnMethodResponseFuture<S, F, B>;
+    type Future = crate::service::future::OnMethodResponseFuture<S, F, B>;
 
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, req: Request<B>) -> Self::Future {
-        let req_method = req.method().clone();
-
-        let head_handler_defined = self.head_handler_defined.load(Ordering::Relaxed);
-
-        let f = if
-        // there is an explicit HEAD handler defined, and that is us
-        (head_handler_defined && req_method == Method::HEAD && self.method.is_head())
-            // there is no head handler defined and we can handle this request
-            || (!head_handler_defined
-                && self.method.matches(&Method::GET)
-                && (req_method == Method::GET || req_method == Method::HEAD))
-            // fallback to general method match
-            || self.method.matches(req.method())
-        {
-            let fut = self.svc.clone().oneshot(req);
-            RouteFuture::a(fut)
-        } else {
-            let fut = self.fallback.clone().oneshot(req);
-            RouteFuture::b(fut)
-        };
-
-        future::OnMethodResponseFuture { f, req_method }
+        crate::service::route_request_and_handle_head_overrides(
+            req,
+            &self.svc,
+            &self.fallback,
+            &self.head_handler_defined,
+            self.method,
+        )
     }
 }

@@ -15,7 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Breaking changes
 
-None.
+- Automatically route `HEAD` requests to `GET` handlers if the path matches. Can
+  be overridden by declaring a handler for `HEAD` requests for the same path.
 
 # 0.1.2 (01. August, 2021)
 

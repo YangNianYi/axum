@@ -8,6 +8,7 @@
 //! - [Routing](#routing)
 //!     - [Precedence](#precedence)
 //!     - [Matching multiple methods](#matching-multiple-methods)
+//!     - [HEAD requests](#head-requests)
 //! - [Extractors](#extractors)
 //! - [Building responses](#building-responses)
 //! - [Applying middleware](#applying-middleware)
@@ -208,6 +209,14 @@
 //! # axum::Server::bind(&"".parse().unwrap()).serve(wont_work.into_make_service()).await.unwrap();
 //! # };
 //! ```
+//!
+//! ## HEAD requests
+//!
+//! `HEAD` requests are handled automatically when there exists a `GET` route
+//! that would otherwise match. You can also specialize the handling of a `HEAD`
+//! request by declaring a route for it.
+//!
+//! Responses to `HEAD` requests will always have the body discarded.
 //!
 //! # Extractors
 //!
