@@ -274,6 +274,8 @@ pub struct OnMethod<S, F> {
     method: MethodFilter,
     svc: S,
     fallback: F,
+    /// See comment on `crate::handler::OnMethod::head_handler_defined` for
+    /// details on what this is.
     head_handler_defined: Arc<AtomicBool>,
 }
 
