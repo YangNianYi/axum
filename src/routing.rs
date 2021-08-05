@@ -71,6 +71,10 @@ impl MethodFilter {
             _ => false,
         }
     }
+
+    pub(crate) fn is_head(self) -> bool {
+        matches!(self, MethodFilter::Head)
+    }
 }
 
 /// A route that sends requests to one of two [`Service`]s depending on the
@@ -391,7 +395,8 @@ pin_project! {
     pub struct RouteFuture<S, F, B>
     where
         S: Service<Request<B>>,
-        F: Service<Request<B>> {
+        F: Service<Request<B>>
+    {
         #[pin] inner: RouteFutureInner<S, F, B>,
     }
 }

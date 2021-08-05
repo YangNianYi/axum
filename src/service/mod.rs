@@ -433,7 +433,7 @@ impl<S, F> OnMethod<S, F> {
     }
 }
 
-// this is identical to `routing::OnMethod`'s implementation. Would be nice to find a way to clean
+// this is identical to `handler::OnMethod`'s implementation. Would be nice to find a way to clean
 // that up, but not sure its possible.
 impl<S, F, B> Service<Request<B>> for OnMethod<S, F>
 where

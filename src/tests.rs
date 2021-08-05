@@ -4,7 +4,11 @@ use crate::{
 };
 use bytes::Bytes;
 use futures_util::future::Ready;
-use http::{header::AUTHORIZATION, Request, Response, StatusCode, Uri};
+use http::{
+    header::AUTHORIZATION,
+    header::{self, HeaderMap},
+    Request, Response, StatusCode, Uri,
+};
 use hyper::{Body, Server};
 use serde::Deserialize;
 use serde_json::json;
@@ -17,6 +21,7 @@ use std::{
 use tower::{make::Shared, service_fn, BoxError, Service, ServiceBuilder};
 use tower_http::{compression::CompressionLayer, trace::TraceLayer};
 
+mod get_to_head;
 mod nest;
 
 #[tokio::test]

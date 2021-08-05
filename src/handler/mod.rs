@@ -9,12 +9,16 @@ use crate::{
 };
 use async_trait::async_trait;
 use bytes::Bytes;
-use http::{Request, Response};
+use http::{Method, Request, Response};
 use std::{
     convert::Infallible,
     fmt,
     future::Future,
     marker::PhantomData,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     task::{Context, Poll},
 };
 use tower::{BoxError, Layer, Service, ServiceExt};
@@ -165,10 +169,13 @@ pub fn on<H, B, T>(method: MethodFilter, handler: H) -> OnMethod<IntoService<H, 
 where
     H: Handler<B, T>,
 {
+    let head_handler_defined = Arc::new(AtomicBool::new(method.is_head()));
+
     OnMethod {
         method,
         svc: handler.into_service(),
         fallback: EmptyRouter::method_not_allowed(),
+        head_handler_defined,
     }
 }
 
@@ -450,11 +457,22 @@ where
 
 /// A handler [`Service`] that accepts requests based on a [`MethodFilter`] and
 /// allows chaining additional handlers.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct OnMethod<S, F> {
-    pub(crate) method: MethodFilter,
-    pub(crate) svc: S,
-    pub(crate) fallback: F,
+    method: MethodFilter,
+    svc: S,
+    fallback: F,
+    /// true if any of the `OnMethod`s in the stack explicitly handles HEAD
+    /// requests.
+    ///
+    /// While `get(handler)` does handle HEAD its not explicit HEAD handler.
+    /// Only `head(handler)` and `get(handler).head(handler)` are explicit HEAD
+    /// handlers.
+    ///
+    /// This is used to route HEAD requests to a GET handler if no explicit HEAD
+    /// handler has been defined. If a HEAD handler has been defined we should
+    /// route to that, not to a GET handler.
+    head_handler_defined: Arc<AtomicBool>,
 }
 
 impl<S, F> OnMethod<S, F> {
@@ -601,9 +619,14 @@ impl<S, F> OnMethod<S, F> {
     where
         H: Handler<B, T>,
     {
+        if method.is_head() {
+            self.head_handler_defined.store(true, Ordering::Relaxed);
+        }
+
         OnMethod {
             method,
             svc: handler.into_service(),
+            head_handler_defined: self.head_handler_defined.clone(),
             fallback: self,
         }
     }
@@ -616,19 +639,34 @@ where
 {
     type Response = Response<BoxBody>;
     type Error = Infallible;
-    type Future = RouteFuture<S, F, B>;
+    type Future = future::OnMethodResponseFuture<S, F, B>;
 
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, req: Request<B>) -> Self::Future {
-        if self.method.matches(req.method()) {
+        let req_method = req.method().clone();
+
+        let head_handler_defined = self.head_handler_defined.load(Ordering::Relaxed);
+
+        let f = if
+        // there is an explicit HEAD handler defined, and that is us
+        (head_handler_defined && req_method == Method::HEAD && self.method.is_head())
+            // there is no head handler defined and we can handle this request
+            || (!head_handler_defined
+                && self.method.matches(&Method::GET)
+                && (req_method == Method::GET || req_method == Method::HEAD))
+            // fallback to general method match
+            || self.method.matches(req.method())
+        {
             let fut = self.svc.clone().oneshot(req);
             RouteFuture::a(fut)
         } else {
             let fut = self.fallback.clone().oneshot(req);
             RouteFuture::b(fut)
-        }
+        };
+
+        future::OnMethodResponseFuture { f, req_method }
     }
 }
