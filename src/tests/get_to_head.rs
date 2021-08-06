@@ -27,7 +27,6 @@ mod for_handlers {
             .unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(res.headers()["x-some-header"], "foobar");
-        assert_eq!(res.headers()["content-length"], "0");
         assert_eq!(res.text().await.unwrap(), "");
     }
 
@@ -53,7 +52,6 @@ mod for_handlers {
             .unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(res.headers()["x-some-header"], "foobar");
-        assert_eq!(res.headers()["content-length"], "0");
         assert_eq!(res.text().await.unwrap(), "");
 
         let res = client
@@ -88,7 +86,6 @@ mod for_handlers {
             .unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(res.headers()["x-some-header"], "foobar");
-        assert_eq!(res.headers()["content-length"], "0");
         assert_eq!(res.text().await.unwrap(), "");
 
         let res = client
@@ -124,7 +121,6 @@ mod for_handlers {
             .unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(res.headers()["x-some-header"], "foobar");
-        assert_eq!(res.headers()["content-length"], "0");
         assert_eq!(res.text().await.unwrap(), "");
 
         let res = client
@@ -174,7 +170,6 @@ mod for_services {
             .unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(res.headers()["x-some-header"], "foobar");
-        assert_eq!(res.headers()["content-length"], "0");
         assert_eq!(res.text().await.unwrap(), "");
     }
 
@@ -203,7 +198,6 @@ mod for_services {
             .unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(res.headers()["x-some-header"], "foobar");
-        assert_eq!(res.headers()["content-length"], "0");
         assert_eq!(res.text().await.unwrap(), "");
 
         let res = client
@@ -241,7 +235,6 @@ mod for_services {
             .unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(res.headers()["x-some-header"], "foobar");
-        assert_eq!(res.headers()["content-length"], "0");
         assert_eq!(res.text().await.unwrap(), "");
 
         let res = client
@@ -280,7 +273,6 @@ mod for_services {
             .unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(res.headers()["x-some-header"], "foobar");
-        assert_eq!(res.headers()["content-length"], "0");
         assert_eq!(res.text().await.unwrap(), "");
 
         let res = client

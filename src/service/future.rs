@@ -7,10 +7,7 @@ use crate::{
 };
 use bytes::Bytes;
 use futures_util::ready;
-use http::{
-    header::{HeaderValue, CONTENT_LENGTH},
-    Method, Request, Response,
-};
+use http::{Method, Request, Response};
 use http_body::Empty;
 use pin_project_lite::pin_project;
 use std::{
@@ -84,8 +81,9 @@ where
         // HEAD must not contain a body according to
         // https://httpwg.org/specs/rfc7231.html#HEAD
         if *this.req_method == Method::HEAD {
-            res.headers_mut()
-                .insert(CONTENT_LENGTH, HeaderValue::from_static("0"));
+            // headers that describe the body, such as `Content-Length` should not be
+            // removed as stated here
+            // https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods/HEAD
             res = res.map(|_| box_body(Empty::new()));
         }
 
